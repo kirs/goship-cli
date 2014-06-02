@@ -17,5 +17,5 @@ user: kirs # your nickname
 And then run:
 
 ```bash
-goship deploy production => deploy app to production
+goship-cli deploy production => deploy app to production
 ```

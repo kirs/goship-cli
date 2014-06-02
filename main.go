@@ -9,8 +9,8 @@ import (
 func usage() {
 	fmt.Printf(`Usage of %s:
 	 Tasks:
-	   goship deploy [env] : Deploy to _env_
-	`, os.Args[0])
+	   %s deploy [env] : Deploy to _env_
+	`, os.Args[0], os.Args[0])
 	os.Exit(1)
 }
 
