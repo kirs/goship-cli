@@ -29,12 +29,12 @@ type DeployConfig struct {
 }
 
 const (
-	CONFIG_NAME = ".goship.yaml"
+	CONFIG_NAME = ".goship.yml"
 )
 
-func startDeployRequest(finished chan int, config *DeployConfig) {
+func startDeployRequest(finished chan int, deployEnv string, config *DeployConfig) {
 	v := url.Values{}
-	v.Set("project", projectName)
+	v.Set("project", config.Project)
 	v.Add("repo_owner", config.RepoOwner)
 	v.Add("repo_name", config.RepoName)
 	v.Add("from_revision", "9922f9fd0c751e6071d50858a09c1fa9fb410bd0")
@@ -51,19 +51,11 @@ func startDeployRequest(finished chan int, config *DeployConfig) {
 	finished <- 1
 }
 
-var (
-	deployEnv   string
-	projectName string
-)
-
-func main() {
+func deploy(deployEnv string) {
 	finished := make(chan int)
 
-	projectName = os.Args[1]
-	deployEnv = os.Args[2]
-
-	if len(deployEnv) == 0 || len(projectName) == 0 {
-		log.Fatal("syntax: gshp navigator production")
+	if len(deployEnv) == 0 {
+		log.Fatal("empty environment")
 	}
 
 	config := DeployConfig{}
@@ -73,12 +65,12 @@ func main() {
 		log.Fatal("failed to read %s: %s", CONFIG_NAME, err)
 	}
 
-	log.Printf("Deploying project `%s` to `%s`", projectName, deployEnv)
-
 	err = yaml.Unmarshal(configData, &config)
 	if err != nil {
 		log.Fatalf("error: %v", err)
 	}
+
+	log.Printf("Deploying project `%s` to `%s`", config.Project, deployEnv)
 
 	var handshakeDialer = &websocket.Dialer{
 		Subprotocols:    []string{"chat"},
@@ -102,10 +94,10 @@ func main() {
 	log.Printf("Connected: %s\n", resp.Status)
 
 	// launch deploy
-	go startDeployRequest(finished, &config)
+	go startDeployRequest(finished, deployEnv, &config)
 
 	go func(ch chan int) {
-		req := <-ch
+		<-ch
 		os.Exit(0)
 	}(finished)
 
