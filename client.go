@@ -32,17 +32,61 @@ const (
 	CONFIG_NAME = ".goship.yml"
 )
 
+type GoshipProjectStatus struct {
+	Name         string
+	RepoOwner    string
+	RepoName     string
+	Environments []GoshipProjectEnvironment
+}
+
+type GoshipProjectEnvironment struct {
+	Name               string
+	Deploy             string
+	RepoPath           string
+	LatestGitHubCommit string
+	IsDeployable       bool
+	Hosts              []struct {
+		URI          string
+		LatestCommit string
+	}
+}
+
 func startDeployRequest(finished chan int, deployEnv string, config *DeployConfig) {
+	commits_url := fmt.Sprintf("http://%s/commits/%s", config.Host, config.Project)
+	commits_request, err := http.Get(commits_url)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var status GoshipProjectStatus
+	var project_env *GoshipProjectEnvironment
+
+	commits_response, _ := ioutil.ReadAll(commits_request.Body)
+	err = json.Unmarshal(commits_response, &status)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, v := range status.Environments {
+		if v.Name == deployEnv {
+			project_env = &v
+		}
+	}
+
+	if !project_env.IsDeployable {
+		log.Fatalf("%s is not deployable", deployEnv)
+	}
+
 	v := url.Values{}
 	v.Set("project", config.Project)
-	v.Add("repo_owner", config.RepoOwner)
-	v.Add("repo_name", config.RepoName)
-	v.Add("from_revision", "9922f9fd0c751e6071d50858a09c1fa9fb410bd0")
-	v.Add("to_revision", "0269450e29e3690dbe984963dfdb991edd872fba")
+	v.Add("repo_owner", status.RepoOwner)
+	v.Add("repo_name", status.RepoName)
+	v.Add("from_revision", project_env.Hosts[0].LatestCommit)
+	v.Add("to_revision", project_env.LatestGitHubCommit)
 	v.Add("environment", deployEnv)
 	v.Add("user", config.User)
 
-	_, err := http.PostForm(fmt.Sprintf("http://%s/deploy_handler", config.Host), v)
+	_, err = http.PostForm(fmt.Sprintf("http://%s/deploy_handler", config.Host), v)
 
 	if err != nil {
 		log.Fatal(err)
